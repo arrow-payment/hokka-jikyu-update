@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ほっかインポート変換</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="common.js"></script>
+  <script src="hourly.js"></script>
+  <script src="commute.js"></script>
+  <script src="payroll.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>ほっかインポート変換</h1>
+
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept=".xlsx">
+      <span class="drop-main">元データのExcelを選択</span>
+      <span class="drop-sub">またはここにドロップ</span>
+    </label>
+
+    <section class="error" id="error" hidden>
+      <p class="message"></p>
+      <ul></ul>
+    </section>
+
+    <section id="outputs" hidden>
+      <p class="result-file" id="result-file"></p>
+      <div class="tabs" id="tabs" role="tablist"></div>
+      <div id="panels"></div>
+    </section>
+  </main>
+
+  <template id="panel-template">
+    <div class="panel" role="tabpanel">
+      <label class="drop current" hidden>
+        <input type="file" accept=".xlsx">
+        <span class="drop-main"></span>
+        <span class="drop-sub">またはここにドロップ</span>
+      </label>
+      <div class="view"></div>
+    </div>
+  </template>
+
+  <template id="result-template">
+    <div class="view">
+      <div class="notice" hidden>
+        <p class="message"></p>
+        <ul></ul>
+      </div>
+      <div class="result">
+        <dl class="summary">
+          <div><dt>従業員</dt><dd class="emp-count"></dd></div>
+          <div><dt>出力行</dt><dd class="out-count"></dd></div>
+        </dl>
+        <p class="breakdown"></p>
+        <div class="filters">
+          <input type="search" class="filter" placeholder="社員コードで絞り込み">
+          <label class="only-flagged"><input type="checkbox"><span></span></label>
+        </div>
+        <div class="preview">
+          <table>
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <button type="button" class="download">ダウンロード</button>
+      </div>
+      <div class="error" hidden>
+        <p class="message"></p>
+        <ul></ul>
+      </div>
+    </div>
+  </template>
+</body>
+</html>
