@@ -14,6 +14,7 @@
 // - ARROWにいて元データにいない人は出力しない。元データにいてARROWにいない人は
 //   上書き先がないので出力できず、一覧で知らせる
 // - 1行目の __format_version と2行目の見出しはエクスポートのものをそのまま使う
+// - 上書きは PAYROLL_FIELDS の項目単位で選べる。選ばなかった項目は現在の登録のまま出す
 
 const PAYROLL_SOURCE_COLUMNS = {
   emp: '社員番号',
@@ -37,6 +38,14 @@ const PAYROLL_CURRENT_COLUMNS = {
   personal2: '個人別単価2',
 };
 
+// 画面で選べる更新項目。cols は PAYROLL_CURRENT_COLUMNS のキー
+const PAYROLL_FIELDS = [
+  { key: 'commute', label: '通勤手当', cols: ['commute', 'commuteMethod', 'commuteAmount', 'commuteCap'] },
+  { key: 'paidLeave', label: '有給休暇全日使用単価', cols: ['paidLeaveMethod', 'paidLeave'] },
+  { key: 'personal1', label: '個人別単価1(宅配手当)', cols: ['personal1'] },
+  { key: 'personal2', label: '個人別単価2(残業2)', cols: ['personal2'] },
+];
+
 // 「04:30:00」「4:30」→ 分。Excelの時刻セル(1日=1の小数)にも対応
 function parseMinutes(v) {
   if (typeof v === 'number') return Math.round(v < 1 ? v * 24 * 60 : v * 60);
@@ -47,7 +56,9 @@ function parseMinutes(v) {
 const amount = (v) => (v === null || v === '' ? 0 : v);
 
 // sourceRows: 元データシートの全行 / currentRows: ARROWのエクスポートの全行(1行目が __format_version)
-function convertPayroll(sourceRows, currentRows) {
+// selected: 上書きする PAYROLL_FIELDS の key の集合(省略時は全項目)
+function convertPayroll(sourceRows, currentRows, selected = new Set(PAYROLL_FIELDS.map((f) => f.key))) {
+  const selectedCols = new Set(PAYROLL_FIELDS.filter((f) => selected.has(f.key)).flatMap((f) => f.cols));
   const src = findColumns(sourceRows[0], PAYROLL_SOURCE_COLUMNS);
   const byEmp = groupByEmployee(dataRows(sourceRows, src), src);
 
@@ -100,6 +111,7 @@ function convertPayroll(sourceRows, currentRows) {
     const row = header.map((_, i) => current[i] ?? null);
     const changedCols = new Set();
     for (const [key, value] of Object.entries(updates)) {
+      if (!selectedCols.has(key)) continue;
       const i = cur[key];
       if (str(row[i]) !== value) changedCols.add(i);
       row[i] = value;
@@ -136,5 +148,6 @@ const PAYROLL = {
   // 現在の登録から値が変わる行の色を変える
   highlighter: (outRows, result) => (row) => result.changed.has(row),
   highlightLabel: '変更ありのみ',
+  fields: PAYROLL_FIELDS,
   convert: convertPayroll,
 };

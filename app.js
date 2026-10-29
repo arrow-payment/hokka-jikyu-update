@@ -75,12 +75,35 @@ function renderPreview(view, conv, result) {
   view.querySelector('tbody').replaceChildren(body);
 }
 
-// convert を実行し、結果(またはエラー)の表示を panel の .view に作り直す
-function renderResult(panel, conv, convert) {
+// 更新項目のチェックボックスを作る。変更のたびに onChange で作り直す
+function renderFields(view, conv, selected, onChange) {
+  if (!conv.fields) return;
+  view.querySelector('.field-list').replaceChildren(...conv.fields.map(({ key, label }) => {
+    const box = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = selected.has(key);
+    input.addEventListener('change', () => {
+      if (input.checked) selected.add(key);
+      else selected.delete(key);
+      onChange();
+    });
+    const span = document.createElement('span');
+    span.textContent = label;
+    box.append(input, span);
+    return box;
+  }));
+  view.querySelector('.fields').hidden = false;
+}
+
+// convert を実行し、結果(またはエラー)の表示を panel の .view に作り直す。
+// conv.fields がある場合は selected(選択中の更新項目の key の集合)を convert に渡す
+function renderResult(panel, conv, convert, selected) {
+  const prev = panel.querySelector('.view');
   const view = $('result-template').content.firstElementChild.cloneNode(true);
-  panel.querySelector('.view').replaceWith(view);
+  prev.replaceWith(view);
   try {
-    const result = convert();
+    const result = convert(selected);
     const { outRows, empCount, stats, notice } = result;
     view.querySelector('.emp-count').textContent = `${empCount}名`;
     view.querySelector('.out-count').textContent = `${outRows.length}行`;
@@ -91,8 +114,13 @@ function renderResult(panel, conv, convert) {
     if (notice) fillMessage(view.querySelector('.notice'), notice);
     renderPreview(view, conv, result);
 
+    renderFields(view, conv, selected, () => renderResult(panel, conv, convert, selected));
+
+    // 項目の選択で作り直したときも絞り込み条件は引き継ぐ
     const filter = view.querySelector('.filter');
     const onlyFlagged = view.querySelector('.only-flagged input');
+    filter.value = prev.querySelector('.filter')?.value ?? '';
+    onlyFlagged.checked = prev.querySelector('.only-flagged input')?.checked ?? false;
     view.querySelector('.only-flagged span').textContent = conv.highlightLabel;
     const applyFilter = () => {
       const q = filter.value.trim().toUpperCase();
@@ -101,6 +129,7 @@ function renderResult(panel, conv, convert) {
           || (onlyFlagged.checked && !('flagged' in tr.dataset));
       }
     };
+    applyFilter();
     filter.addEventListener('input', applyFilter);
     onlyFlagged.addEventListener('change', applyFilter);
     view.querySelector('.download').addEventListener('click', () => {
@@ -122,6 +151,7 @@ function buildPanel(conv, sheetRows) {
   }
 
   // 現在の登録状況(ARROWのエクスポート)と突き合わせるタブは、追加でそのファイルを受け取る
+  const selected = new Set(conv.fields?.map((f) => f.key));
   const zone = panel.querySelector('.current');
   zone.hidden = false;
   zone.querySelector('.drop-main').textContent = conv.current.label;
@@ -129,7 +159,9 @@ function buildPanel(conv, sheetRows) {
     if (!file) return;
     const data = await file.arrayBuffer();
     zone.querySelector('.drop-sub').textContent = file.name;
-    renderResult(panel, conv, () => conv.convert(sheetRows, readSheetRows(XLSX, data)));
+    // 読み取りエラーも renderResult で表示するよう、初回の convert で読む
+    let currentRows;
+    renderResult(panel, conv, (sel) => conv.convert(sheetRows, currentRows ??= readSheetRows(XLSX, data), sel), selected);
   });
   return panel;
 }
