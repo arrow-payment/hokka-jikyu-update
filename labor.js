@@ -8,6 +8,8 @@
 // - 週所定労働日数 = 勤務曜日の曜日数(「日・祝」のような祝は数えない)
 // - 週所定労働時間 = 曜日数 × 1日の勤務時間。「6:00」の形式で出す
 // - 複数店舗の人は全店舗の行を合算する(曜日数は重複を除いた数、時間は店舗ごとの合計)
+// - 勤務曜日が読めない・空欄・0の行、1日の勤務時間が読めない・0の行は使わない。
+//   使える行が1つもない人は出力せず、一覧で知らせる
 // - ARROWにいて元データにいない人は出力しない。元データにいてARROWにいない人は
 //   上書き先がないので出力できず、一覧で知らせる
 // - 1行目の __format_version と2行目の見出しはエクスポートのものをそのまま使う
@@ -62,6 +64,7 @@ function convertLabor(sourceRows, currentRows, selected = new Set(LABOR_FIELDS.m
   const changed = new Map();
   const seen = new Set();
   const duplicates = [];
+  const skipped = [];
   const stats = { '複数店舗': 0 };
   for (const current of currentRows.slice(2)) {
     const emp = str(current[cur.emp]);
@@ -72,15 +75,20 @@ function convertLabor(sourceRows, currentRows, selected = new Set(LABOR_FIELDS.m
     const { rows } = byEmp.get(emp);
     const days = new Set();
     let weekMinutes = 0;
+    let used = 0;
     for (const r of rows) {
       const rowDays = parseWeekdays(r[src.days]);
-      if (!rowDays?.size) throw new ConvertError(`${emp}: 勤務曜日が読めません(${str(r[src.days])})`);
       const minutes = parseMinutes(r[src.hours]);
-      if (minutes === null) throw new ConvertError(`${emp}: 1日の勤務時間が読めません(${r[src.hours]})`);
+      if (!rowDays?.size || !minutes) continue;
       rowDays.forEach((d) => days.add(d));
       weekMinutes += rowDays.size * minutes;
+      used++;
     }
-    if (rows.length > 1) stats['複数店舗']++;
+    if (!used) {
+      skipped.push(emp);
+      continue;
+    }
+    if (used > 1) stats['複数店舗']++;
 
     const updates = {
       weekDays: String(days.size),
@@ -106,9 +114,13 @@ function convertLabor(sourceRows, currentRows, selected = new Set(LABOR_FIELDS.m
   if (duplicates.length) {
     throw new ConvertError('ARROWの労働条件に同じ社員コードが複数あります', duplicates);
   }
-  if (!outRows.length) throw new ConvertError('元データとARROWの労働条件で一致する社員コードがありません');
+  if (!outRows.length) throw new ConvertError('元データとARROWの労働条件で一致し、出力できる従業員がいません');
 
   const missing = [...byEmp.keys()].filter((e) => !seen.has(e));
+  const details = [
+    ...skipped.map((e) => `${e}(勤務曜日・勤務時間が空欄か0)`),
+    ...missing.map((e) => `${e}(ARROWに登録なし)`),
+  ];
   return {
     outRows,
     empCount: outRows.length,
@@ -117,8 +129,8 @@ function convertLabor(sourceRows, currentRows, selected = new Set(LABOR_FIELDS.m
     header,
     formatVersion: str(currentRows[0][1]),
     colWidths: header.map((h) => Math.max(8, str(h).length * 2)),
-    notice: missing.length
-      ? { message: `ARROWに登録がないため出力できない従業員がいます(${missing.length}名)`, details: missing }
+    notice: details.length
+      ? { message: `出力しなかった従業員がいます(${details.length}名)`, details }
       : null,
   };
 }
