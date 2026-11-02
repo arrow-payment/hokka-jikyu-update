@@ -7,9 +7,10 @@
 //
 // - 週所定労働日数 = 勤務曜日の曜日数(「日・祝」のような祝は数えない)
 // - 週所定労働時間 = 曜日数 × 1日の勤務時間。「6:00」の形式で出す
-// - 複数店舗の人は全店舗の行を合算する(曜日数は重複を除いた数、時間は店舗ごとの合計)
-// - 勤務曜日が読めない・空欄・0の行、1日の勤務時間が読めない・0の行は使わない。
-//   使える行が1つもない人は出力せず、一覧で知らせる
+// - 複数店舗の人は親店舗の行の値を使う。子店舗の行にも同じ勤務曜日・時間が入っているため
+//   合算しない(ユーザー確認済み)
+// - 勤務曜日が読めない・空欄・0の人、1日の勤務時間が読めない・0・24時間超の人は
+//   出力せず、一覧で知らせる
 // - ARROWにいて元データにいない人は出力しない。元データにいてARROWにいない人は
 //   上書き先がないので出力できず、一覧で知らせる
 // - 1行目の __format_version と2行目の見出しはエクスポートのものをそのまま使う
@@ -72,23 +73,19 @@ function convertLabor(sourceRows, currentRows, selected = new Set(LABOR_FIELDS.m
     if (seen.has(emp)) duplicates.push(emp);
     seen.add(emp);
 
-    const { rows } = byEmp.get(emp);
-    const days = new Set();
-    let weekMinutes = 0;
-    let used = 0;
-    for (const r of rows) {
-      const rowDays = parseWeekdays(r[src.days]);
-      const minutes = parseMinutes(r[src.hours]);
-      if (!rowDays?.size || !minutes) continue;
-      rowDays.forEach((d) => days.add(d));
-      weekMinutes += rowDays.size * minutes;
-      used++;
-    }
-    if (!used) {
-      skipped.push(emp);
+    const { main, rows } = byEmp.get(emp);
+    const days = parseWeekdays(main[src.days]);
+    const minutes = parseMinutes(main[src.hours]);
+    if (!days?.size || !minutes) {
+      skipped.push(`${emp}(勤務曜日・勤務時間が空欄か0)`);
       continue;
     }
-    if (used > 1) stats['複数店舗']++;
+    if (minutes > 24 * 60) {
+      skipped.push(`${emp}(1日の勤務時間が24時間超: ${str(main[src.hours])})`);
+      continue;
+    }
+    const weekMinutes = days.size * minutes;
+    if (rows.length > 1) stats['複数店舗']++;
 
     const updates = {
       weekDays: String(days.size),
@@ -118,7 +115,7 @@ function convertLabor(sourceRows, currentRows, selected = new Set(LABOR_FIELDS.m
 
   const missing = [...byEmp.keys()].filter((e) => !seen.has(e));
   const details = [
-    ...skipped.map((e) => `${e}(勤務曜日・勤務時間が空欄か0)`),
+    ...skipped,
     ...missing.map((e) => `${e}(ARROWに登録なし)`),
   ];
   return {
