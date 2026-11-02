@@ -73,6 +73,7 @@ function renderPreview(view, conv, result) {
     body.append(tr);
   });
   view.querySelector('tbody').replaceChildren(body);
+  return flaggedEmps;
 }
 
 // 更新項目のチェックボックスを作る。変更のたびに onChange で作り直す
@@ -112,7 +113,7 @@ function renderResult(panel, conv, convert, selected) {
       .map(([k, v]) => `${k} ${v}名`)
       .join(' / ');
     if (notice) fillMessage(view.querySelector('.notice'), notice);
-    renderPreview(view, conv, result);
+    const flaggedEmps = renderPreview(view, conv, result);
 
     renderFields(view, conv, selected, () => renderResult(panel, conv, convert, selected));
 
@@ -122,18 +123,24 @@ function renderResult(panel, conv, convert, selected) {
     filter.value = prev.querySelector('.filter')?.value ?? '';
     onlyFlagged.checked = prev.querySelector('.only-flagged input')?.checked ?? false;
     view.querySelector('.only-flagged span').textContent = conv.highlightLabel;
+    // downloadFlaggedOnly のタブは、チェック中は対象の従業員だけをダウンロードする
+    const download = view.querySelector('.download');
+    const flaggedDownload = () => conv.downloadFlaggedOnly && onlyFlagged.checked;
     const applyFilter = () => {
       const q = filter.value.trim().toUpperCase();
       for (const tr of view.querySelector('tbody').rows) {
         tr.hidden = (q !== '' && !tr.dataset.emp.toUpperCase().includes(q))
           || (onlyFlagged.checked && !('flagged' in tr.dataset));
       }
+      download.textContent = flaggedDownload() ? `${conv.highlightLabel}をダウンロード(${flaggedEmps.size}名)` : 'ダウンロード';
+      download.disabled = flaggedDownload() && !flaggedEmps.size;
     };
     applyFilter();
     filter.addEventListener('input', applyFilter);
     onlyFlagged.addEventListener('change', applyFilter);
-    view.querySelector('.download').addEventListener('click', () => {
-      XLSX.writeFile(buildWorkbook(XLSX, { ...conv, ...result }), outputFileName(conv.filePrefix));
+    download.addEventListener('click', () => {
+      const rows = flaggedDownload() ? outRows.filter((r) => flaggedEmps.has(r[0])) : outRows;
+      XLSX.writeFile(buildWorkbook(XLSX, { ...conv, ...result, outRows: rows }), outputFileName(conv.filePrefix));
     });
   } catch (err) {
     console.error(err);

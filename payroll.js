@@ -141,6 +141,7 @@ const PAYROLL = {
   // 現在の登録から値が変わる行の色を変える
   highlighter: (outRows, result) => (row) => result.changed.has(row),
   highlightLabel: '変更ありのみ',
+  downloadFlaggedOnly: true,
   fields: PAYROLL_FIELDS,
   convert: convertPayroll,
 };

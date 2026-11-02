@@ -230,6 +230,7 @@ button {
   cursor: pointer;
 }
 button:hover { opacity: .9; }
+button:disabled { opacity: .4; cursor: default; }
 
 .error {
   background: var(--error-bg);
