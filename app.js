@@ -64,6 +64,8 @@ function renderPreview(view, conv, result) {
     head.append(th);
   }
   view.querySelector('thead').replaceChildren(head);
+  // 出力の社員名・カナ列も検索対象にする(元データで名前が引けない場合にも探せるように)
+  const nameCols = header.map(normalizeHeader).flatMap((h, i) => (/^(社員名|氏名)/.test(h) ? [i] : []));
 
   // 従業員ごとに背景を交互にし、highlight 対象の行は色を変える。
   // チェックボックスの絞り込みは従業員単位(対象行が1つでもある人の全行を残す)
@@ -78,7 +80,7 @@ function renderPreview(view, conv, result) {
       tr.classList.add('emp-start');
     }
     tr.dataset.emp = row[0];
-    tr.dataset.search = searchKeys.get(str(row[0])) ?? toSearchKey(row[0]);
+    tr.dataset.search = (searchKeys.get(str(row[0])) ?? '') + toSearchKey([row[0], ...nameCols.map((i) => row[i])].join(''));
     if (flaggedEmps.has(row[0])) tr.dataset.flagged = '';
     if (band) tr.classList.add('band');
     if (highlight(row)) tr.classList.add('exception');
