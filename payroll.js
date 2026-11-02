@@ -46,13 +46,6 @@ const PAYROLL_FIELDS = [
   { key: 'personal2', label: '個人別単価2(残業2)', cols: ['personal2'] },
 ];
 
-// 「04:30:00」「4:30」→ 分。Excelの時刻セル(1日=1の小数)にも対応
-function parseMinutes(v) {
-  if (typeof v === 'number') return Math.round(v < 1 ? v * 24 * 60 : v * 60);
-  const m = str(v).match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
-}
-
 const amount = (v) => (v === null || v === '' ? 0 : v);
 
 // sourceRows: 元データシートの全行 / currentRows: ARROWのエクスポートの全行(1行目が __format_version)

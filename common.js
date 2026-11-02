@@ -1,6 +1,6 @@
 'use strict';
 
-// 時給・通勤手当の変換で共通に使う処理
+// 各変換で共通に使う処理
 
 const SOURCE_SHEET = '元データ';
 const OUTPUT_SHEET = 'インポート用';
@@ -14,7 +14,16 @@ class ConvertError extends Error {
 
 const str = (v) => (v === null || v === undefined ? '' : String(v).trim());
 // 見出しは空白(全角含む)を除き、全角かっこを半角に揃えて完全一致で探す
-const normalizeHeader = (v) => str(v).replace(/\s/g, '').replace(/（/g, '(').replace(/）/g, ')');
+const normalizeHeader = (v) => str(v).replace(/\s/g, '').replace(/（/g, '(').replace(/）/g, ')')
+  .replace(/［/g, '[').replace(/］/g, ']');
+
+// 「04:30:00」「4:30」→ 分。Excelの時刻セル(1日=1の小数)にも対応
+function parseMinutes(v) {
+  if (typeof v === 'number') return Math.round(v < 1 ? v * 24 * 60 : v * 60);
+  const m = str(v).match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
 
 // columns: { key: 見出し名 } → { key: 列index }
 function findColumns(headerRow, columns) {

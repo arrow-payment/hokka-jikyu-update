@@ -3,7 +3,7 @@
 // 元データ・ARROWのエクスポートはブラウザのメモリ上でだけ処理し、外部送信も保存(localStorage等)もしない
 // 1つの元データから、タブごとに各インポート用データを作る
 
-const CONVERTERS = [HOURLY, COMMUTE, PAYROLL];
+const CONVERTERS = [HOURLY, COMMUTE, PAYROLL, LABOR];
 const $ = (id) => document.getElementById(id);
 
 function fillMessage(box, { message, details }) {
