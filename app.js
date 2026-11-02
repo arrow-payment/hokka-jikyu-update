@@ -6,6 +6,24 @@
 const CONVERTERS = [HOURLY, COMMUTE, PAYROLL, LABOR];
 const $ = (id) => document.getElementById(id);
 
+// 検索用に、元データの社員番号 → 「社員番号 氏名 フリガナ」を持つ。
+// 空白を除き、全角英数・半角カナ・ひらがな・小文字の違いは無視して探せるようにする
+let searchKeys = new Map();
+const toSearchKey = (v) => str(v).normalize('NFKC').replace(/\s/g, '')
+  .replace(/[ぁ-ゖ]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60)).toUpperCase();
+
+function buildSearchKeys(sheetRows) {
+  const names = (sheetRows[0] || []).map(normalizeHeader);
+  const [emp, name, kana] = ['社員番号', '氏名', '氏名(フリガナ)'].map((h) => names.indexOf(h));
+  const keys = new Map();
+  if (emp < 0) return keys;
+  for (const r of sheetRows.slice(1)) {
+    const code = str(r[emp]);
+    if (code && !keys.has(code)) keys.set(code, toSearchKey([code, r[name], r[kana]].join('')));
+  }
+  return keys;
+}
+
 function fillMessage(box, { message, details }) {
   box.querySelector('.message').textContent = message;
   box.querySelector('ul').replaceChildren(...(details || []).map((d) => {
@@ -60,6 +78,7 @@ function renderPreview(view, conv, result) {
       tr.classList.add('emp-start');
     }
     tr.dataset.emp = row[0];
+    tr.dataset.search = searchKeys.get(str(row[0])) ?? toSearchKey(row[0]);
     if (flaggedEmps.has(row[0])) tr.dataset.flagged = '';
     if (band) tr.classList.add('band');
     if (highlight(row)) tr.classList.add('exception');
@@ -127,9 +146,9 @@ function renderResult(panel, conv, convert, selected) {
     const download = view.querySelector('.download');
     const flaggedDownload = () => conv.downloadFlaggedOnly && onlyFlagged.checked;
     const applyFilter = () => {
-      const q = filter.value.trim().toUpperCase();
+      const q = toSearchKey(filter.value);
       for (const tr of view.querySelector('tbody').rows) {
-        tr.hidden = (q !== '' && !tr.dataset.emp.toUpperCase().includes(q))
+        tr.hidden = (q !== '' && !tr.dataset.search.includes(q))
           || (onlyFlagged.checked && !('flagged' in tr.dataset));
       }
       download.textContent = flaggedDownload() ? `${conv.highlightLabel}をダウンロード(${flaggedEmps.size}名)` : 'ダウンロード';
@@ -190,6 +209,7 @@ async function handleFile(file) {
   if (!file) return;
   try {
     const sheetRows = readSourceRows(XLSX, await file.arrayBuffer());
+    searchKeys = buildSearchKeys(sheetRows);
     for (const conv of CONVERTERS) {
       const tab = document.createElement('button');
       tab.type = 'button';
